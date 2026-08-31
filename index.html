@@ -1,0 +1,599 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Nexora Academy — Site Downloader 3.0</title>
+  <meta name="description" content="Nexora Academy Site Downloader 3.0: capture qualquer site em um ZIP offline completo." />
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%23f97316'/><text x='16' y='22' font-family='Arial' font-size='15' font-weight='700' text-anchor='middle' fill='white'>A</text></svg>" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+
+  <style>
+    :root {
+      --paper: #080a0d;
+      --surface: #101419;
+      --surface-soft: #151b22;
+      --ink: #f8fafc;
+      --ink-soft: #c2ccd8;
+      --muted: #7e8b9c;
+      --line: rgba(255, 255, 255, 0.1);
+      --line-strong: rgba(255, 255, 255, 0.2);
+      --blue: #ff7a18;
+      --blue-dark: #e85d04;
+      --blue-soft: rgba(249, 115, 22, 0.12);
+      --green: #4ade80;
+      --green-soft: rgba(74, 222, 128, 0.1);
+      --amber: #fbbf24;
+      --danger: #fb7185;
+      --mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+      --sans: 'Space Grotesk', Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body { min-height: 100%; }
+
+    body {
+      min-height: 100vh;
+      min-height: 100dvh;
+      overflow-x: hidden;
+      color: var(--ink);
+      background-color: var(--paper);
+      background-image:
+        linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+        radial-gradient(circle at 74% 8%, rgba(249, 115, 22, 0.16), transparent 28%),
+        radial-gradient(circle at 8% 92%, rgba(251, 146, 60, 0.08), transparent 24%);
+      background-size: 42px 42px, 42px 42px, auto, auto;
+      font-family: var(--sans);
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    body::before {
+      content: '';
+      position: fixed;
+      z-index: -1;
+      width: 560px;
+      height: 560px;
+      top: -300px;
+      right: -160px;
+      border-radius: 50%;
+      background: rgba(249, 115, 22, 0.18);
+      filter: blur(2px);
+      pointer-events: none;
+    }
+
+    body::after {
+      content: '';
+      position: fixed;
+      z-index: -1;
+      width: 420px;
+      height: 420px;
+      bottom: -260px;
+      left: -160px;
+      border-radius: 50%;
+      background: rgba(251, 146, 60, 0.08);
+      pointer-events: none;
+    }
+
+    ::selection { color: #fff; background: var(--blue); }
+    button, input { font: inherit; }
+    button:focus-visible, input:focus-visible, a:focus-visible { outline: 3px solid rgba(37, 99, 235, 0.25); outline-offset: 3px; }
+
+    ::-webkit-scrollbar { width: 7px; height: 7px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 99px; }
+    ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+    .bg-canvas, .bg-glow, .bg-vignette, .hud-overlay { display: none; }
+
+    .stage {
+      min-height: 100vh;
+      min-height: 100dvh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 32px 20px;
+      perspective: 1200px;
+    }
+
+    .card {
+      width: min(100%, 1040px);
+      overflow: hidden;
+      position: relative;
+      background: linear-gradient(145deg, rgba(20, 25, 31, 0.97), rgba(10, 13, 17, 0.98));
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      border-radius: 18px;
+      box-shadow: 0 30px 90px rgba(0, 0, 0, 0.52), 0 0 0 1px rgba(249, 115, 22, 0.08), 0 0 80px rgba(249, 115, 22, 0.08);
+      animation: cardIn 0.55s ease-out both;
+      transform-style: preserve-3d;
+    }
+
+    @keyframes cardIn {
+      from { opacity: 0; transform: translateY(12px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 8%;
+      right: 8%;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, var(--blue), transparent);
+      box-shadow: 0 0 18px rgba(249, 115, 22, 0.65);
+    }
+
+    .card-head {
+      min-height: 66px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 18px;
+      padding: 16px 28px;
+      border-bottom: 1px solid var(--line);
+      background: rgba(11, 14, 18, 0.75);
+    }
+
+    .card-head .left, .card-head .right { display: flex; align-items: center; }
+    .card-head .left { gap: 13px; }
+    .card-head .dots { display: flex; gap: 5px; }
+    .card-head .dots span { width: 8px; height: 8px; border-radius: 50%; background: #3a4654; }
+    .card-head .dots span.live { background: var(--blue); box-shadow: 0 0 10px rgba(249, 115, 22, 0.75); }
+    .card-head .left > span { color: var(--muted); font: 500 11px var(--mono); letter-spacing: 0.04em; }
+    .card-head .right {
+      gap: 8px;
+      padding: 7px 11px;
+      color: var(--blue);
+      background: var(--blue-soft);
+      border: 1px solid rgba(249, 115, 22, 0.28);
+      border-radius: 999px;
+      font: 500 10px var(--mono);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+    .card-head .right .pulse { width: 6px; height: 6px; border-radius: 50%; background: var(--blue); box-shadow: 0 0 9px rgba(249, 115, 22, 0.75); }
+
+    .card-body {
+      display: grid;
+      grid-template-columns: minmax(0, 0.9fr) minmax(340px, 1.1fr);
+      gap: clamp(34px, 6vw, 72px);
+      padding: clamp(36px, 6vw, 68px);
+    }
+
+    .intro { min-width: 0; padding-top: 4px; }
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 20px;
+      color: var(--blue);
+      font: 600 10px var(--mono);
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+    .eyebrow::before { content: ''; width: 22px; height: 2px; border-radius: 3px; background: var(--blue); }
+
+    .brand { display: flex; align-items: center; gap: 14px; margin-bottom: 22px; }
+    .brand .mark {
+      width: 48px;
+      height: 48px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex: 0 0 auto;
+      color: #fff;
+      background: var(--blue);
+      border-radius: 14px;
+      box-shadow: 0 8px 18px rgba(37, 99, 235, 0.24);
+      font-size: 21px;
+      font-weight: 700;
+      letter-spacing: -0.06em;
+    }
+    .brand .name { color: var(--ink); font-size: clamp(25px, 3vw, 32px); font-weight: 700; line-height: 1.08; letter-spacing: -0.055em; }
+    .brand .accent { color: var(--blue); }
+
+    .desc { max-width: 450px; margin-bottom: 32px; color: var(--ink-soft); font-size: 17px; line-height: 1.65; }
+    .desc b { color: var(--ink); font-weight: 700; }
+
+    .benefits { display: grid; gap: 13px; max-width: 430px; padding-top: 22px; border-top: 1px solid var(--line); }
+    .benefit { display: flex; align-items: flex-start; gap: 12px; color: var(--muted); font-size: 13px; }
+    .benefit-number { color: var(--blue); font: 600 10px var(--mono); line-height: 1.8; }
+    .benefit strong { color: var(--ink-soft); font-weight: 600; }
+
+    .workspace {
+      min-width: 0;
+      align-self: start;
+      padding: 26px;
+      position: relative;
+      background: rgba(21, 27, 34, 0.8);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 14px;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.035), 0 16px 36px rgba(0, 0, 0, 0.2);
+    }
+    .workspace::before {
+      content: 'NXR / 02';
+      position: absolute;
+      top: 12px;
+      right: 14px;
+      color: rgba(255, 255, 255, 0.16);
+      font: 9px var(--mono);
+      letter-spacing: 0.12em;
+    }
+    .workspace-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 24px; }
+    .workspace-title {       color: var(--ink); font-size: 18px; font-weight: 600; letter-spacing: -0.03em; }
+    .workspace-subtitle { margin-top: 3px; color: var(--muted); font-size: 12px; }
+    .workspace-badge { color: var(--blue); font: 500 9px var(--mono); text-transform: uppercase; letter-spacing: 0.1em; white-space: nowrap; }
+
+    .form-label { display: flex; align-items: center; gap: 7px; margin-bottom: 9px; color: var(--muted); font: 600 10px var(--mono); letter-spacing: 0.1em; text-transform: uppercase; }
+    .form-label .accent { color: var(--blue); font-size: 15px; line-height: 0; }
+    .form-row { display: flex; flex-direction: column; gap: 10px; }
+
+    .input-wrap { position: relative; background: rgba(5, 7, 10, 0.72); border: 1px solid var(--line-strong); border-radius: 8px; transition: border-color .2s, box-shadow .2s; }
+    .input-wrap:focus-within { border-color: var(--blue); box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12); }
+    .input-wrap::before { content: '↗'; position: absolute; top: 50%; left: 14px; transform: translateY(-50%); color: var(--blue); font-size: 14px; pointer-events: none; }
+    .input-wrap input { width: 100%; padding: 15px 15px 15px 37px; color: var(--ink); background: transparent; border: 0; outline: 0; font: 13px var(--mono); }
+    .input-wrap input::placeholder { color: #94a3b8; }
+    .input-wrap input:disabled { opacity: .55; cursor: not-allowed; }
+
+    .grab-btn {
+      position: relative;
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 9px;
+      padding: 14px 18px;
+      color: #fff;
+      background: var(--blue);
+      border: 0;
+      border-radius: 8px;
+      box-shadow: 0 8px 20px rgba(249, 115, 22, 0.2), 0 0 24px rgba(249, 115, 22, 0.08);
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      transition: background .2s, transform .1s, box-shadow .2s;
+    }
+    .grab-btn:hover:not(:disabled) {       background: var(--blue-dark); box-shadow: 0 10px 24px rgba(249, 115, 22, 0.3), 0 0 30px rgba(249, 115, 22, 0.12); }
+    .grab-btn:active:not(:disabled) { transform: translateY(1px); }
+    .grab-btn:disabled { color: #93c5fd; background: #dbeafe; box-shadow: none; cursor: not-allowed; }
+    .grab-btn .arrow { transition: transform .2s; font-size: 16px; line-height: 0; }
+    .grab-btn:hover:not(:disabled) .arrow { transform: translateX(3px); }
+    .spinner { display: none; width: 14px; height: 14px; border: 2px solid rgba(255,255,255,.35); border-top-color: #fff; border-radius: 50%; animation: spin .7s linear infinite; }
+    .grab-btn.loading .spinner { display: block; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .capture-actions { display: flex; justify-content: flex-end; min-height: 0; margin-top: 9px; }
+    .cancel-btn { display: none; align-items: center; gap: 6px; padding: 6px 9px; color: var(--danger); background: transparent; border: 1px solid rgba(251, 113, 133, 0.3); border-radius: 6px; cursor: pointer; font: 10px var(--mono); text-transform: uppercase; letter-spacing: .05em; }
+    .cancel-btn.visible { display: inline-flex; }
+    .cancel-btn:hover { background: rgba(251, 113, 133, 0.08); }
+    .progress-wrap { display: flex; align-items: center; gap: 10px; margin-top: 14px; }
+    .progress-track { height: 4px; overflow: hidden; flex: 1; background: rgba(255, 255, 255, 0.09); border-radius: 9px; }
+    .progress-bar { width: 0%; height: 100%; background: linear-gradient(90deg, var(--blue-dark), var(--blue)); border-radius: inherit; transition: width .35s ease; }
+    .progress-value { min-width: 33px; color: var(--blue); font: 10px var(--mono); text-align: right; }
+    .form-meta { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 12px; color: var(--muted); font: 10px var(--mono); }
+    .form-meta .left { display: flex; flex-wrap: wrap; gap: 10px; }
+    .form-meta .left span { display: inline-flex; align-items: center; gap: 5px; }
+    .form-meta .left span::before { content: '•'; color: #22c55e; font-size: 15px; line-height: 0; }
+    .form-meta .right { color: var(--blue); }
+
+    .log-shell { max-height: 0; overflow: hidden; opacity: 0; margin-top: 0; background: rgba(5, 7, 10, 0.76); border: 1px solid var(--line); border-radius: 10px; transition: max-height .45s ease, opacity .3s ease, margin-top .3s ease; }
+    .log-shell.open { max-height: 280px; margin-top: 20px; opacity: 1; }
+    .log-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 13px; background: rgba(255, 255, 255, 0.035); border-bottom: 1px solid var(--line); }
+    .log-head .left, .log-head .right { display: flex; align-items: center; gap: 8px; }
+    .log-head .left span, .log-head .right { color: var(--muted); font: 10px var(--mono); text-transform: uppercase; letter-spacing: .08em; }
+    .log-head .scan { width: 20px; height: 2px; background: var(--blue); border-radius: 2px; }
+    .log-head .right { color: var(--blue); }
+    .log-head .right .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--blue); }
+    .log-body { max-height: 220px; overflow-y: auto; padding: 12px 13px; font: 11px/1.7 var(--mono); background-image: linear-gradient(rgba(255, 255, 255, 0.018) 1px, transparent 1px); background-size: 100% 22px; }
+    .log-line, .cursor-line { display: flex; gap: 9px; }
+    .log-line { color: var(--ink-soft); animation: logIn .3s ease-out; }
+    .log-line .ts, .cursor-line .ts { flex: 0 0 auto; color: #94a3b8; font-size: 10px; user-select: none; }
+    .log-line .ic, .cursor-line .ic { flex: 0 0 12px; color: var(--blue); }
+    .log-line .msg { flex: 1; word-break: break-word; }
+    .log-line.ok .msg { color: var(--green); font-weight: 500; }
+    .log-line.err .msg { color: var(--danger); }
+    .log-line.warn .msg { color: var(--amber); }
+    @keyframes logIn { from { opacity: 0; transform: translateY(-3px); } to { opacity: 1; transform: translateY(0); } }
+    .cursor-line { color: var(--blue); }
+    .cursor-line .blink { width: 7px; height: 13px; background: var(--blue); animation: blink 1s step-end infinite; }
+    @keyframes blink { 0%, 50% { opacity: 1; } 51%, 100% { opacity: 0; } }
+
+    .history { margin-top: 22px; padding-top: 18px; border-top: 1px solid var(--line); }
+    .history-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 9px; }
+    .history-title { color: var(--muted); font: 10px var(--mono); letter-spacing: .08em; text-transform: uppercase; }
+    .history-clear { color: var(--blue); background: transparent; border: 0; cursor: pointer; font: 10px var(--mono); text-transform: uppercase; }
+    .history-list { display: grid; gap: 6px; }
+    .history-empty { color: rgba(126, 139, 156, .75); font-size: 11px; }
+    .history-item { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 10px; background: rgba(255,255,255,.025); border: 1px solid var(--line); border-radius: 7px; }
+    .history-url { min-width: 0; overflow: hidden; color: var(--ink-soft); font: 10px var(--mono); text-overflow: ellipsis; white-space: nowrap; }
+    .history-status { color: var(--green); font: 9px var(--mono); text-transform: uppercase; }
+    .success-shell { display: none; align-items: center; gap: 13px; margin-top: 16px; padding: 14px; background: var(--green-soft); border: 1px solid rgba(74, 222, 128, .3); border-radius: 10px; }
+    .success-shell.open { display: flex; animation: successIn .4s ease-out; }
+    .success-icon { display: flex; align-items: center; justify-content: center; width: 32px; height: 32px; flex: 0 0 auto; color: var(--green); background: #dcfce7; border-radius: 50%; font-size: 17px; }
+    .success-text { min-width: 0; flex: 1; }
+    .success-text .title { color: var(--green); font-size: 12px; font-weight: 700; }
+    .success-text .meta { margin-top: 2px; color: #4b6b56; font-size: 11px; }
+    .success-link { display: inline-flex; align-items: center; gap: 6px; flex: 0 0 auto; padding: 9px 12px; color: #fff; background: var(--green); border-radius: 8px; text-decoration: none; font-size: 10px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; transition: background .2s; }
+    .success-link:hover { background: #166534; }
+    @keyframes successIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+
+    @media (max-width: 780px) {
+      .stage { align-items: flex-start; padding: 16px; }
+      .card { border-radius: 18px; }
+      .card-head { padding: 15px 18px; }
+      .card-body { grid-template-columns: 1fr; gap: 32px; padding: 30px 22px 24px; }
+      .intro { padding-top: 0; }
+      .workspace { padding: 20px; }
+    }
+
+    @media (max-width: 460px) {
+      .card-head .left > span { font-size: 9px; }
+      .card-head .right { padding: 6px 8px; font-size: 9px; }
+      .brand .mark { width: 42px; height: 42px; border-radius: 12px; }
+      .brand .name { font-size: 24px; }
+      .desc { font-size: 15px; }
+      .workspace-head { display: block; }
+      .workspace-badge { display: block; margin-top: 8px; }
+      .form-meta { align-items: flex-start; flex-direction: column; gap: 4px; }
+      .success-shell { align-items: flex-start; flex-wrap: wrap; }
+      .success-link { width: 100%; justify-content: center; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+    }
+  </style>
+</head>
+<body>
+  <main class="stage">
+    <section class="card" aria-label="Nexora Academy Site Downloader 2.0">
+      <div class="card-head">
+        <div class="left">
+          <div class="dots" aria-hidden="true"><span class="live"></span><span></span><span></span></div>
+          <span>nexora / academy</span>
+        </div>
+        <div class="right"><span class="pulse" aria-hidden="true"></span><span id="head-status">pronto</span></div>
+      </div>
+
+      <div class="card-body">
+        <div class="intro">
+          <div class="eyebrow">Nexora protocol · captura offline</div>
+          <div class="brand">
+            <span class="mark" aria-hidden="true">N</span>
+            <span class="name">Nexora Academy <span class="accent">Downloader 3.0</span></span>
+          </div>
+          <p class="desc">Transforme um site em um <b>ZIP offline completo</b>, com seus arquivos organizados para abrir localmente e sem depender da internet.</p>
+          <div class="benefits" aria-label="Recursos da ferramenta">
+            <div class="benefit"><span class="benefit-number">01</span><span><strong>Arquivos preservados.</strong> HTML, CSS, JavaScript, imagens e fontes em um só pacote.</span></div>
+            <div class="benefit"><span class="benefit-number">02</span><span><strong>Sites modernos.</strong> Captura páginas com animações, SPAs e conteúdo renderizado.</span></div>
+          </div>
+        </div>
+
+        <div class="workspace">
+          <div class="workspace-head">
+            <div><div class="workspace-title">Nova captura</div><div class="workspace-subtitle">Informe o endereço do site que deseja salvar.</div></div>
+            <span class="workspace-badge">v3.0 · estável</span>
+          </div>
+
+          <div class="form-label"><span class="accent">↗</span><span>URL do site</span></div>
+          <form class="form-row" onsubmit="event.preventDefault(); startGrab();">
+            <div class="input-wrap">
+              <input type="url" id="url" placeholder="https://exemplo.com" autocomplete="off" spellcheck="false" aria-label="URL do site a capturar" />
+            </div>
+            <button type="submit" id="grab" class="grab-btn"><span id="btn-label">Baixar site</span><div class="spinner" id="spin" aria-hidden="true"></div><span class="arrow" id="btn-arrow">→</span></button>
+          </form>
+          <div class="capture-actions"><button type="button" id="cancel" class="cancel-btn" onclick="cancelGrab()">× Cancelar captura</button></div>
+          <div class="progress-wrap" aria-label="Progresso da captura"><div class="progress-track"><div class="progress-bar" id="progress-bar"></div></div><span class="progress-value" id="progress-value">0%</span></div>
+          <div class="form-meta"><div class="left"><span>ZIP offline</span><span>processamento seguro</span></div><span class="right">v3.0</span></div>
+
+          <div class="log-shell" id="log-shell" aria-live="polite">
+            <div class="log-head"><div class="left"><div class="scan"></div><span>progresso da captura</span></div><div class="right"><div class="dot"></div><span>ao vivo</span></div></div>
+            <div class="log-body" id="logs" role="log"></div>
+          </div>
+
+          <div class="success-shell" id="ok">
+            <div class="success-icon" aria-hidden="true">✓</div>
+            <div class="success-text"><div class="title">Captura concluída</div><div class="meta">Seu ZIP está pronto para download.</div></div>
+            <a class="success-link" id="dl-link" href="#" download><span aria-hidden="true">↓</span> Baixar ZIP</a>
+          </div>
+          <div class="history" id="history"><div class="history-head"><span class="history-title">Últimas capturas</span><button class="history-clear" type="button" onclick="clearHistory()">Limpar</button></div><div class="history-list" id="history-list"></div></div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    let es = null;
+    let cursorEl = null;
+    let currentSid = null;
+    let progress = 0;
+
+    function startGrab() {
+      const input = document.getElementById('url');
+      let url = input.value.trim();
+      if (!url) { flashError(input); return; }
+      if (!/^https?:\/\//i.test(url)) { url = 'https://' + url; input.value = url; }
+
+      setLoading(true);
+      setProgress(4);
+      setHeadStatus('capturando');
+      closeSuccess();
+      clearLogs();
+      openLogs();
+      addCursor();
+
+      fetch('/start-download', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url })
+      })
+        .then(r => r.json())
+        .then(data => {
+          if (data.error) {
+            removeCursor(); addLog('Erro: ' + data.error, 'err'); setHeadStatus('falhou'); setLoading(false); return;
+          }
+          currentSid = data.session_id;
+          saveHistory(url, 'capturando');
+          listenSSE(data.session_id);
+        })
+        .catch(err => {
+          removeCursor(); addLog('Erro de rede: ' + err.message, 'err'); setHeadStatus('falhou'); setLoading(false);
+        });
+    }
+
+    function listenSSE(sid) {
+      es = new EventSource('/stream/' + sid);
+      es.onmessage = e => { addLog(e.data); updateProgress(e.data); };
+      es.addEventListener('done', e => {
+        es.close(); es = null; removeCursor();
+        if (e.data === 'complete') { setProgress(100); setHeadStatus('concluído'); saveHistory(document.getElementById('url').value, 'concluído'); triggerDownload(sid); showSuccess(sid); }
+        else if (e.data === 'canceled') { setHeadStatus('cancelado'); saveHistory(document.getElementById('url').value, 'cancelado'); addLog('Captura cancelada.', 'warn'); setProgress(0); }
+        else { setHeadStatus('falhou'); saveHistory(document.getElementById('url').value, 'falhou'); }
+        currentSid = null;
+        setTimeout(() => setLoading(false), 400);
+      });
+      es.onerror = () => {
+        if (es) { es.close(); es = null; }
+        removeCursor(); setHeadStatus('desconectado'); setProgress(0); setLoading(false);
+      };
+    }
+
+    function triggerDownload(sid) {
+      const href = '/download-file/' + sid;
+      const a = document.createElement('a'); a.href = href; a.click();
+      document.getElementById('dl-link').href = href;
+    }
+
+    function setLoading(on) {
+      const btn = document.getElementById('grab');
+      const lbl = document.getElementById('btn-label');
+      const arr = document.getElementById('btn-arrow');
+      const inp = document.getElementById('url');
+      btn.disabled = on; inp.disabled = on;
+      document.getElementById('cancel').classList.toggle('visible', on);
+      if (on) { btn.classList.add('loading'); lbl.textContent = 'Capturando'; arr.style.display = 'none'; }
+      else { btn.classList.remove('loading'); lbl.textContent = 'Baixar site'; arr.style.display = ''; }
+    }
+
+    function setHeadStatus(text) {
+      const el = document.getElementById('head-status');
+      if (el) el.textContent = text;
+    }
+
+    function flashError(input) {
+      input.focus();
+      const wrap = input.closest('.input-wrap');
+      wrap.style.borderColor = '#c2410c';
+      wrap.style.boxShadow = '0 0 0 3px rgba(194,65,12,.14)';
+      setTimeout(() => { wrap.style.borderColor = ''; wrap.style.boxShadow = ''; }, 1400);
+    }
+
+    function openLogs() { document.getElementById('log-shell').classList.add('open'); }
+    function clearLogs() { document.getElementById('logs').innerHTML = ''; }
+
+    function classifyLine(text) {
+      const t = text.trim();
+      if (/^(❌|⛔|🚫|✗)/.test(t) || /^erro/i.test(t) || /falhou/i.test(t)) return 'err';
+      if (/^(⚠️|⚠)/.test(t) || /aviso/i.test(t)) return 'warn';
+      if (/^(✅|✔|✓|🎉|🟢)/.test(t) || /pronto/i.test(t) || /conclu(í|i)d/i.test(t)) return 'ok';
+      return '';
+    }
+
+    function addLog(text, forcedClass) {
+      const box = document.getElementById('logs');
+      const cls = forcedClass || classifyLine(text);
+      const el = document.createElement('div');
+      el.className = 'log-line ' + cls;
+      el.innerHTML = `<span class="ts">${nowTS()}</span><span class="ic">${cls === 'err' ? '✗' : cls === 'warn' ? '!' : cls === 'ok' ? '✓' : '›'}</span><span class="msg"></span>`;
+      el.querySelector('.msg').textContent = text;
+      if (cursorEl && cursorEl.parentNode === box) box.insertBefore(el, cursorEl); else box.appendChild(el);
+      box.scrollTop = box.scrollHeight;
+    }
+
+    function addCursor() {
+      const box = document.getElementById('logs');
+      cursorEl = document.createElement('div'); cursorEl.className = 'cursor-line';
+      cursorEl.innerHTML = `<span class="ts">${nowTS()}</span><span class="ic">›</span><span class="blink"></span>`;
+      box.appendChild(cursorEl);
+    }
+
+    function removeCursor() {
+      if (cursorEl && cursorEl.parentNode) cursorEl.parentNode.removeChild(cursorEl);
+      cursorEl = null;
+    }
+
+    function nowTS() {
+      const d = new Date(); const pad = n => String(n).padStart(2, '0');
+      return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+    }
+
+    function setProgress(value) {
+      progress = Math.max(0, Math.min(100, value));
+      document.getElementById('progress-bar').style.width = progress + '%';
+      document.getElementById('progress-value').textContent = Math.round(progress) + '%';
+    }
+
+    function updateProgress(text) {
+      const t = text.toLowerCase();
+      let next = progress + 3;
+      if (/iniciando|carregando/.test(t)) next = Math.max(next, 10);
+      if (/networkidle|url base/.test(t)) next = Math.max(next, 22);
+      if (/rolando/.test(t)) next = Math.max(next, 34);
+      if (/recursos|salvando|assets/.test(t)) next = Math.max(next, 52);
+      if (/fallback|dynamic imports/.test(t)) next = Math.max(next, 68);
+      if (/processando|reescrit/.test(t)) next = Math.max(next, 82);
+      if (/concluído|download pronto/.test(t)) next = Math.max(next, 96);
+      setProgress(Math.min(94, next));
+    }
+
+    function cancelGrab() {
+      if (!currentSid) return;
+      setHeadStatus('cancelando');
+      addLog('Solicitando cancelamento...', 'warn');
+      fetch('/cancel/' + currentSid, { method: 'POST' }).catch(() => addLog('Não foi possível enviar o cancelamento.', 'err'));
+    }
+
+    function getHistory() {
+      try { return JSON.parse(localStorage.getItem('nexora_capture_history') || '[]'); } catch (_) { return []; }
+    }
+
+    function saveHistory(url, status) {
+      if (!url) return;
+      const list = getHistory().filter(item => item.url !== url);
+      list.unshift({ url, status, at: new Date().toLocaleString('pt-BR') });
+      localStorage.setItem('nexora_capture_history', JSON.stringify(list.slice(0, 5)));
+      renderHistory();
+    }
+
+    function renderHistory() {
+      const list = getHistory();
+      const box = document.getElementById('history-list');
+      box.innerHTML = '';
+      if (!list.length) { box.innerHTML = '<span class="history-empty">Nenhuma captura recente.</span>'; return; }
+      list.forEach(item => {
+        const row = document.createElement('div'); row.className = 'history-item';
+        const url = document.createElement('span'); url.className = 'history-url'; url.title = item.url; url.textContent = item.url;
+        const status = document.createElement('span'); status.className = 'history-status'; status.textContent = item.status;
+        row.append(url, status); box.appendChild(row);
+      });
+    }
+
+    function clearHistory() { localStorage.removeItem('nexora_capture_history'); renderHistory(); }
+
+    function showSuccess() { document.getElementById('ok').classList.add('open'); }
+    function closeSuccess() { document.getElementById('ok').classList.remove('open'); }
+
+    document.getElementById('url').addEventListener('keydown', e => {
+      if (e.key === 'Enter' && !document.getElementById('grab').disabled) { e.preventDefault(); startGrab(); }
+    });
+    renderHistory();
+  </script>
+</body>
+</html>
