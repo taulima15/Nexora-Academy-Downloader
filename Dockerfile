@@ -1,20 +1,32 @@
-FROM python:3.12-slim
+# Use official Python base image
+FROM python:3.12-slim-bookworm
 
-ENV PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1 \
-    PLAYWRIGHT_BROWSERS_PATH=/ms-playwright \
-    PORT=5001
+# System dependencies for Playwright + curl for healthchecks
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    wget \
+    gnupg \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
-COPY requirements.txt ./
-RUN pip install --no-cache-dir -r requirements.txt \
-    && playwright install --with-deps chromium
+# Install Python deps first (better layer caching)
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
 
-COPY app.py grabber.py entrypoint.sh ./
-COPY templates ./templates
-RUN chmod +x entrypoint.sh && mkdir -p downloads
+# Install Chromium + the OS libs Playwright needs
+RUN playwright install --with-deps chromium
 
-EXPOSE 5001
+# Copy application code
+COPY . .
 
-ENTRYPOINT ["/app/entrypoint.sh"]
+RUN mkdir -p downloads
+
+COPY entrypoint.sh /app/entrypoint.sh
+RUN chmod +x /app/entrypoint.sh
+
+# Default port (Railway/Render override this via $PORT)
+ENV PORT=8080
+EXPOSE 8080
+
+CMD ["/bin/bash", "/app/entrypoint.sh"]

@@ -1,15 +1,12 @@
 import gc
-import ipaddress
 import os
 import queue
-import socket
 import shutil
 import threading
 import time
 import uuid
 
 from flask import Flask, Response, jsonify, render_template, request, send_file
-from urllib.parse import urlparse
 
 from grabber import SiteGrabber, get_site_name, zip_directory
 
@@ -28,7 +25,6 @@ JANITOR_INTERVAL = 300
 # Per-session state
 _sessions: dict[str, dict] = {}
 _queues: dict[str, queue.Queue] = {}
-_cancel_events: dict[str, threading.Event] = {}
 _lock = threading.Lock()
 
 
@@ -41,7 +37,6 @@ def _purge(session_id: str) -> None:
     with _lock:
         result = _sessions.pop(session_id, None)
         _queues.pop(session_id, None)
-        _cancel_events.pop(session_id, None)
     if not result:
         return
     for path in (result.get("zip_path"), os.path.join(DOWNLOAD_FOLDER, session_id)):
@@ -115,8 +110,7 @@ threading.Thread(target=_janitor, daemon=True).start()
 def _worker(session_id: str, url: str) -> None:
     with _lock:
         q = _queues.get(session_id)
-        cancel_event = _cancel_events.get(session_id)
-    if q is None or cancel_event is None:
+    if q is None:
         return
 
     dl_dir = os.path.join(DOWNLOAD_FOLDER, session_id)
@@ -124,14 +118,8 @@ def _worker(session_id: str, url: str) -> None:
     grabber = None
 
     try:
-        grabber = SiteGrabber(url, dl_dir, log=lambda m: q.put(m), cancel_event=cancel_event)
+        grabber = SiteGrabber(url, dl_dir, log=lambda m: q.put(m))
         ok = grabber.grab()
-
-        if cancel_event.is_set():
-            q.put("⏹️ Captura cancelada pelo usuário")
-            with _lock:
-                _sessions[session_id] = {"status": "canceled", "created_at": time.time()}
-            return
 
         if not ok:
             raise RuntimeError("grab() returned False")
@@ -153,18 +141,13 @@ def _worker(session_id: str, url: str) -> None:
             }
 
     except Exception as exc:
-        if cancel_event.is_set():
-            q.put("⏹️ Captura cancelada pelo usuário")
-            with _lock:
-                _sessions[session_id] = {"status": "canceled", "created_at": time.time()}
-        else:
-            q.put(f"❌ Erro: {exc}")
-            with _lock:
-                _sessions[session_id] = {
-                    "status": "error",
-                    "error": str(exc),
-                    "created_at": time.time(),
-                }
+        q.put(f"❌ Erro: {exc}")
+        with _lock:
+            _sessions[session_id] = {
+                "status": "error",
+                "error": str(exc),
+                "created_at": time.time(),
+            }
         if os.path.isdir(dl_dir):
             shutil.rmtree(dl_dir, ignore_errors=True)
         if os.path.isfile(zip_path):
@@ -190,7 +173,7 @@ def index():
 @app.route("/health")
 def health():
     with _lock:
-        info = {"status": "ok", "sessions": len(_sessions), "active": sum(1 for s in _sessions.values() if s.get("status") == "processing")}
+        info = {"status": "ok", "sessions": len(_sessions)}
     return jsonify(info)
 
 
@@ -205,24 +188,10 @@ def start_download():
     if not url.startswith(("http://", "https://")):
         url = "https://" + url.lstrip("/")
 
-    parsed = urlparse(url)
-    hostname = (parsed.hostname or "").lower().rstrip(".")
-    if parsed.scheme not in {"http", "https"} or not hostname:
-        return jsonify({"error": "Informe uma URL HTTP ou HTTPS válida."}), 400
-    if hostname in {"localhost", "localhost.localdomain"} or hostname.endswith(".local"):
-        return jsonify({"error": "Endereços locais não são permitidos."}), 400
-    try:
-        addresses = {socket.gethostbyname(hostname)}
-        if any(ipaddress.ip_address(ip).is_private or ipaddress.ip_address(ip).is_loopback or ipaddress.ip_address(ip).is_link_local for ip in addresses):
-            return jsonify({"error": "Endereços de rede interna não são permitidos."}), 400
-    except socket.gaierror:
-        return jsonify({"error": "Não foi possível resolver o domínio informado."}), 400
-
     sid = str(uuid.uuid4())
     with _lock:
         _queues[sid] = queue.Queue()
-        _cancel_events[sid] = threading.Event()
-        _sessions[sid] = {"status": "processing", "started_at": time.time(), "url": url}
+        _sessions[sid] = {"status": "processing", "started_at": time.time()}
 
     threading.Thread(target=_worker, args=(sid, url), daemon=True).start()
     return jsonify({"session_id": sid})
@@ -250,31 +219,18 @@ def stream(session_id: str):
                 yield f"data: {msg}\n\n"
                 with _lock:
                     s = _sessions.get(session_id, {})
-                if s.get("status") in ("complete", "error", "canceled"):
+                if s.get("status") in ("complete", "error"):
                     yield f"event: done\ndata: {s['status']}\n\n"
                     return
             except queue.Empty:
                 with _lock:
                     s = _sessions.get(session_id, {})
-                if s.get("status") in ("complete", "error", "canceled"):
+                if s.get("status") in ("complete", "error"):
                     yield f"event: done\ndata: {s['status']}\n\n"
                     return
                 yield ": keepalive\n\n"
 
     return Response(generate(), mimetype="text/event-stream")
-
-
-@app.route("/cancel/<session_id>", methods=["POST"])
-def cancel_download(session_id: str):
-    with _lock:
-        session = _sessions.get(session_id)
-        event = _cancel_events.get(session_id)
-    if not session or not event:
-        return jsonify({"error": "Sessão não encontrada"}), 404
-    if session.get("status") != "processing":
-        return jsonify({"error": "A captura já terminou"}), 409
-    event.set()
-    return jsonify({"status": "canceling"})
 
 
 @app.route("/download-file/<session_id>")
@@ -308,4 +264,4 @@ def download_file(session_id: str):
 if __name__ == "__main__":
     # In production (Railway/Render) gunicorn drives the app via entrypoint.sh.
     # This block only runs for `python app.py` during local dev.
-    app.run(host="0.0.0.0", debug=False, port=int(os.environ.get("PORT", 5001)), threaded=True)
+    app.run(debug=True, port=int(os.environ.get("PORT", 5002)), threaded=True)

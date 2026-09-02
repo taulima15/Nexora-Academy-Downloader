@@ -111,12 +111,11 @@ def zip_directory(folder_path: str, output_path: str) -> str:
 
 
 class SiteGrabber:
-    def __init__(self, url: str, output_dir: str, log=print, cancel_event=None):
+    def __init__(self, url: str, output_dir: str, log=print):
         self.url = url
         self.output_dir = output_dir
         self.assets_dir = os.path.join(output_dir, "assets")
         self.log = log
-        self.cancel_event = cancel_event
 
         self._url_map: dict[str, str] = {}   # original_url → "assets/filename"
         self._hash_map: dict[str, str] = {}  # sha256[:16]  → "assets/filename"
@@ -129,10 +128,6 @@ class SiteGrabber:
         if os.path.exists(output_dir):
             shutil.rmtree(output_dir)
         os.makedirs(self.assets_dir, exist_ok=True)
-
-    def _check_cancelled(self):
-        if self.cancel_event is not None and self.cancel_event.is_set():
-            raise RuntimeError("Captura cancelada pelo usuário")
 
     # ── Asset persistence ─────────────────────────────────────────────────────
 
@@ -1957,7 +1952,6 @@ class SiteGrabber:
     # ── Main entry point ──────────────────────────────────────────────────────
 
     def grab(self) -> bool:
-        self._check_cancelled()
         # ── Phase 1: Browser capture ──────────────────────────────────────────
         with sync_playwright() as p:
             self.log("🚀 Iniciando navegador...")
@@ -2096,7 +2090,6 @@ class SiteGrabber:
             except Exception:
                 pass
 
-        self._check_cancelled()
         # ── Phase 2: Persist all captured assets ──────────────────────────────
         self.log(f"💾 Salvando {len(self._captured)} recursos capturados...")
 
